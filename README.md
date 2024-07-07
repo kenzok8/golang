@@ -1,4 +1,4 @@
-### OpenWrt golang latest version 1.22.4
+### OpenWrt golang latest version 1.22.5
 
 ### How to use 1.22.*
 
@@ -8,7 +8,7 @@ git clone https://github.com/kenzok8/golang feeds/packages/lang/golang
 ```
 
 
-### OpenWrt golang latest version 1.21.11
+### OpenWrt golang latest version 1.21.12
 
 ### How to use 1.21.*
 
