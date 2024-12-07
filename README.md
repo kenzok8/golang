@@ -1,5 +1,5 @@
 
-### OpenWrt golang latest version 1.22.9
+### OpenWrt golang latest version 1.22.10
 
 ### How to use 1.22.*
 
