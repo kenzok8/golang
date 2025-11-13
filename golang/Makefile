@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2018, 2020 Jeffery To
+# Copyright (C) 2018-2023 Jeffery To
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -30,11 +30,10 @@ PKG_CPE_ID:=cpe:/a:golang:go
 PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_DIR:=$(BUILD_DIR)/go-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
-PKG_USE_MIPS16:=0
+PKG_BUILD_FLAGS:=no-mips16
 
 PKG_GO_PREFIX:=/usr
 PKG_GO_VERSION_ID:=$(GO_VERSION_MAJOR_MINOR)
-PKG_GO_ROOT:=$(PKG_GO_PREFIX)/lib/go-$(PKG_GO_VERSION_ID)
 
 HOST_BUILD_DIR:=$(BUILD_DIR_HOST)/go-$(PKG_VERSION)
 HOST_BUILD_PARALLEL:=1
@@ -58,33 +57,33 @@ HOST_GO_VALID_OS_ARCH:= \
   \
   dragonfly_amd64 \
   illumos_amd64 \
-  freebsd_riscv64 \
   solaris_amd64 \
   \
   aix_ppc64 \
   js_wasm \
   wasip1_wasm \
   \
+  freebsd_riscv64 \
+  openbsd_riscv64 \
+  \
   linux_ppc64 linux_ppc64le \
   linux_mips linux_mipsle linux_mips64 linux_mips64le \
-  linux_riscv64 linux_s390x \
-  linux_loong64 \
+  linux_loong64 linux_riscv64 linux_s390x \
   \
   openbsd_mips64
 
 ifeq ($(HOST_ARCH),x86_64)
 	PKG_ARCH:=amd64
-	SHA256:=b945ae2bb5db01a0fb4786afde64e6fbab50b67f6fa0eb6cfa4924f16a7ff1eb
+	BOOTSTRAP_HASH:=999805bed7d9039ec3da1a53bfbcafc13e367da52aa823cb60b68ba22d44c616
 endif
 
 ifeq ($(HOST_ARCH),aarch64)
 	PKG_ARCH:=arm64
-	SHA256:=4e15ab37556e979181a1a1cc60f6d796932223a0f5351d7c83768b356f84429b
+	BOOTSTRAP_HASH:=c15fa895341b8eaf7f219fada25c36a610eb042985dc1a912410c1c90098eaf2
 endif
 
-BOOTSTRAP_SOURCE:=go1.20.6.linux-$(PKG_ARCH).tar.gz
+BOOTSTRAP_SOURCE:=go1.22.6.linux-$(PKG_ARCH).tar.gz
 BOOTSTRAP_SOURCE_URL:=$(GO_SOURCE_URLS)
-BOOTSTRAP_HASH:=$(SHA256)
 
 BOOTSTRAP_BUILD_DIR:=$(HOST_BUILD_DIR)/.go_bootstrap
 
@@ -194,8 +193,7 @@ ifeq ($(BOOTSTRAP_ROOT_DIR),)
   $(eval $(call Download,golang-bootstrap))
 
   define Bootstrap/Prepare
-	mkdir -p "$(BOOTSTRAP_BUILD_DIR)"
-	$(BOOTSTRAP_UNPACK)
+	mkdir -p "$(BOOTSTRAP_BUILD_DIR)" && $(BOOTSTRAP_UNPACK) ;
   endef
   Hooks/HostPrepare/Post+=Bootstrap/Prepare
 
@@ -215,6 +213,7 @@ endif
 $(eval $(call GoCompiler/AddProfile,Host,$(HOST_BUILD_DIR),$(HOST_GO_PREFIX),$(HOST_GO_VERSION_ID),$(GO_HOST_OS_ARCH),$(HOST_GO_INSTALL_SUFFIX)))
 
 HOST_GO_VARS= \
+	GOHOSTARCH="$(GO_HOST_ARCH)" \
 	GOCACHE="$(GO_BUILD_CACHE_DIR)" \
 	GOENV=off \
 	CC="$(HOSTCC_NOCACHE)" \
@@ -280,6 +279,7 @@ PKG_GO_ZBOOTSTRAP_MODS:= \
 PKG_GO_ZBOOTSTRAP_PATH:=$(PKG_BUILD_DIR)/src/internal/buildcfg/zbootstrap.go
 
 PKG_GO_VARS= \
+	GOHOSTARCH="$(GO_HOST_ARCH)" \
 	GOCACHE="$(GO_BUILD_CACHE_DIR)" \
 	GOENV=off \
 	GO_GCC_HELPER_PATH="$$$$PATH" \
@@ -339,7 +339,6 @@ define Build/Compile
 		cd "$(PKG_BUILD_DIR)/bin" ; \
 		export $(GO_PKG_TARGET_VARS) ; \
 		$(CP) go go-host ; \
-		GOROOT_FINAL="$(PKG_GO_ROOT)" \
 		GO_GCC_HELPER_CC="$(TARGET_CC)" \
 		GO_GCC_HELPER_CXX="$(TARGET_CXX)" \
 		$(PKG_GO_VARS) \
