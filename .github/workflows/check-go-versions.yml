@@ -1,0 +1,55 @@
+name: Check Go Version Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/check-go-versions.yml'
+
+jobs:
+  check-main-1.24:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Check Go 1.24 version
+        run: |
+          CURRENT=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2)
+          PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2)
+          [ -n "$PATCH" ] && CURRENT="${CURRENT}.${PATCH}"
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.24\.\d+" | sort -V | tail -1 | sed 's/go//')
+          [ "$CURRENT" != "$LATEST" ] && echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
+
+  check-1.25:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.25
+      - name: Check Go 1.25 version
+        run: |
+          CURRENT=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2)
+          PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2)
+          [ -n "$PATCH" ] && CURRENT="${CURRENT}.${PATCH}"
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.25\.\d+" | sort -V | tail -1 | sed 's/go//')
+          [ "$CURRENT" != "$LATEST" ] && echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
+
+  check-1.26:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.26
+      - name: Check Go 1.26 version
+        run: |
+          CURRENT=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2)
+          PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2)
+          [ -n "$PATCH" ] && CURRENT="${CURRENT}.${PATCH}"
+          LATEST=$(curl -sL "https://api.github.com/repos/golang/go/releases" | grep -oP '"tag_name":\s*"\Kgo1\.26[^"]*' | head -1 | sed 's/go//')
+          [ "$CURRENT" != "$LATEST" ] && echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
