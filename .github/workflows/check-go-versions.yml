@@ -11,7 +11,6 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
       hash: ${{ steps.hash.outputs.hash }}
-      branch: main
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,7 +40,6 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
       hash: ${{ steps.hash.outputs.hash }}
-      branch: 1.25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +69,6 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
       hash: ${{ steps.hash.outputs.hash }}
-      branch: 1.26
     steps:
       - uses: actions/checkout@v4
         with:
