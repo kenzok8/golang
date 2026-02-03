@@ -84,7 +84,7 @@ jobs:
       - id: check
         run: |
           CURRENT=$(sed -n '1p' golang/Makefile | cut -d= -f2)
-          LATEST=$(curl -sL "https://api.github.com/repos/golang/go/releases" | grep -oP '"'"'tag_name'"'"':\s*"'"'"'\Kgo1\.26[^"]*' | head -1 | sed 's/go//')
+          LATEST=$(curl -sL "https://api.github.com/repos/golang/go/releases" | grep -oP "tag_name\":\s*\"\Kgo1\.26[^"]*" | head -1 | sed 's/go//')
           if [ "$CURRENT" != "$LATEST" ]; then echo "version=$LATEST" >> $GITHUB_OUTPUT; echo "needs=true" >> $GITHUB_OUTPUT; fi
       - id: hash
         if: steps.check.outputs.needs == 'true'
