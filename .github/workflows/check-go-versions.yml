@@ -1,0 +1,169 @@
+name: Check Go Version Updates
+
+on:
+  schedule:
+    # Run every Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/check-go-versions.yml'
+
+jobs:
+  check-main-1.24:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check Go 1.24 version
+        id: check-1.24
+        run: |
+          # Get current version
+          CURRENT_VERSION=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          CURRENT_PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          if [ -n "$CURRENT_PATCH" ]; then
+            CURRENT_VERSION="${CURRENT_VERSION}.${CURRENT_PATCH}"
+          fi
+          echo "Current 1.24 version: $CURRENT_VERSION"
+          
+          # Fetch latest 1.24.x version
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.24\.\d+" | sort -V | tail -1 | sed 's/go//')
+          echo "Latest 1.24 version: $LATEST"
+          
+          if [ "$CURRENT_VERSION" != "$LATEST" ]; then
+            echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
+            echo "New version: $LATEST" >> $GITHUB_OUTPUT
+          else
+            echo "NEEDS_UPDATE=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get 1.24 hash and update
+        if: steps.check-1.24.outputs.NEEDS_UPDATE == 'true'
+        id: update-1.24
+        run: |
+          NEW_VERSION="${{ steps.check-1.24.outputs.New }}"
+          HASH=$(curl -sL "https://go.dev/dl/go${NEW_VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          
+          # Update Makefile
+          sed -i "s/GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=${NEW_VERSION#*.}/" golang/Makefile
+          
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Create PR for 1.24
+        if: steps.update-1.24.outputs.version != ''
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "golang: update 1.24 to ${{ steps.update-1.24.outputs.version }}"
+          body: "Auto-update Go 1.24 to ${{ steps.update-1.24.outputs.version }}"
+          branch: update/go-1.24-${{ steps.update-1.24.outputs.version }}
+          commit-message: "golang: update to ${{ steps.update-1.24.outputs.version }}"
+          delete-branch: true
+
+  check-1.25:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.25
+
+      - name: Check Go 1.25 version
+        id: check-1.25
+        run: |
+          CURRENT_VERSION=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          CURRENT_PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          if [ -n "$CURRENT_PATCH" ]; then
+            CURRENT_VERSION="${CURRENT_VERSION}.${CURRENT_PATCH}"
+          fi
+          echo "Current 1.25 version: $CURRENT_VERSION"
+          
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.25\.\d+" | sort -V | tail -1 | sed 's/go//')
+          echo "Latest 1.25 version: $LATEST"
+          
+          if [ "$CURRENT_VERSION" != "$LATEST" ]; then
+            echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
+            echo "New version: $LATEST" >> $GITHUB_OUTPUT
+          else
+            echo "NEEDS_UPDATE=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get 1.25 hash and update
+        if: steps.check-1.25.outputs.NEEDS_UPDATE == 'true'
+        id: update-1.25
+        run: |
+          NEW_VERSION="${{ steps.check-1.25.outputs.New }}"
+          HASH=$(curl -sL "https://go.dev/dl/go${NEW_VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          
+          sed -i "s/GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=${NEW_VERSION#*.}/" golang/Makefile
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Create PR for 1.25
+        if: steps.update-1.25.outputs.version != ''
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "golang: update 1.25 to ${{ steps.update-1.25.outputs.version }}"
+          body: "Auto-update Go 1.25 to ${{ steps.update-1.25.outputs.version }}"
+          branch: update/go-1.25-${{ steps.update-1.25.outputs.version }}
+          commit-message: "golang: update to ${{ steps.update-1.25.outputs.version }}"
+          delete-branch: true
+
+  check-1.26:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.26
+
+      - name: Check Go 1.26 version
+        id: check-1.26
+        run: |
+          CURRENT_VERSION=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          CURRENT_PATCH=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2 | tr -d ' ')
+          if [ -n "$CURRENT_PATCH" ]; then
+            CURRENT_VERSION="${CURRENT_VERSION}.${CURRENT_PATCH}"
+          fi
+          echo "Current 1.26 version: $CURRENT_VERSION"
+          
+          # Check for rc/beta versions
+          LATEST=$(curl -sL "https://api.github.com/repos/golang/go/releases" | grep -oP '"tag_name":\s*"\Kgo1\.26[^"]*' | head -1 | sed 's/go//')
+          echo "Latest 1.26 version: $LATEST"
+          
+          if [ "$CURRENT_VERSION" != "$LATEST" ]; then
+            echo "NEEDS_UPDATE=true" >> $GITHUB_OUTPUT
+            echo "New version: $LATEST" >> $GITHUB_OUTPUT
+          else
+            echo "NEEDS_UPDATE=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get 1.26 hash and update
+        if: steps.check-1.26.outputs.NEEDS_UPDATE == 'true'
+        id: update-1.26
+        run: |
+          NEW_VERSION="${{ steps.check-1.26.outputs.New }}"
+          HASH=$(curl -sL "https://go.dev/dl/go${NEW_VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          
+          sed -i "s/GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=${NEW_VERSION#*.}/" golang/Makefile
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Create PR for 1.26
+        if: steps.update-1.26.outputs.version != ''
+        uses: peter-evans/create-pull-request@v7
+        with:
+          title: "golang: update 1.26 to ${{ steps.update-1.26.outputs.version }}"
+          body: "Auto-update Go 1.26 to ${{ steps.update-1.26.outputs.version }}"
+          branch: update/go-1.26-${{ steps.update-1.26.outputs.version }}
+          commit-message: "golang: update to ${{ steps.update-1.26.outputs.version }}"
+          delete-branch: true
