@@ -1,1 +1,219 @@
-# (同上工作流内容)
+name: Check Go Versions
+
+on:
+  schedule:
+    # Run every Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-main:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      hash: ${{ steps.get-hash.outputs.hash }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check Go 1.24 version
+        id: check
+        run: |
+          CURRENT=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2)
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.24\.\d+" | sort -V | tail -1 | sed 's/go1\.24\.//')
+          echo "Current 1.24 patch: $CURRENT"
+          echo "Latest 1.24 patch: $LATEST"
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "version=1.24.${LATEST}" >> $GITHUB_OUTPUT
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get hash for new version
+        id: get-hash
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          echo "Downloading: https://go.dev/dl/go${VERSION}.src.tar.gz"
+          HASH=$(curl -sL "https://go.dev/dl/go${VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Show update info
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          echo "=== Update Info ==="
+          echo "Version: ${{ steps.check.outputs.version }}"
+          echo "Hash: ${{ steps.get-hash.outputs.hash }}"
+          echo "branch=main" >> $GITHUB_OUTPUT
+
+  check-1.25:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      hash: ${{ steps.get-hash.outputs.hash }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.25
+
+      - name: Check Go 1.25 version
+        id: check
+        run: |
+          CURRENT=$(grep "GO_VERSION_PATCH:=" golang/Makefile | cut -d= -f2)
+          LATEST=$(curl -sL "https://go.dev/dl/" | grep -oP "go1\.25\.\d+" | sort -V | tail -1 | sed 's/go1\.25\.//')
+          echo "Current 1.25 patch: $CURRENT"
+          echo "Latest 1.25 patch: $LATEST"
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "version=1.25.${LATEST}" >> $GITHUB_OUTPUT
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get hash for new version
+        id: get-hash
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          HASH=$(curl -sL "https://go.dev/dl/go${VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+  check-1.26:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      hash: ${{ steps.get-hash.outputs.hash }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.26
+
+      - name: Check Go 1.26 version
+        id: check
+        run: |
+          CURRENT=$(grep "GO_VERSION_MAJOR_MINOR:=" golang/Makefile | cut -d= -f2 | tr -d '\r')
+          LATEST=$(curl -sL "https://api.github.com/repos/golang/go/releases" | grep -oP '"tag_name":\s*"\Kgo1\.26[^"]*' | head -1 | sed 's/go//')
+          echo "Current 1.26 version: $CURRENT"
+          echo "Latest 1.26 version: $LATEST"
+          if [ "$CURRENT" != "$LATEST" ]; then
+            echo "version=$LATEST" >> $GITHUB_OUTPUT
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get hash for new version
+        id: get-hash
+        if: steps.check.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          HASH=$(curl -sL "https://go.dev/dl/go${VERSION}.src.tar.gz" | sha256sum | cut -d' ' -f1)
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+  update-main:
+    needs: check-main
+    if: needs.check-main.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Update Makefile
+        run: |
+          VERSION="${{ needs.check-main.outputs.version }}"
+          HASH="${{ needs.check-main.outputs.hash }}"
+          
+          # Update GO_VERSION_PATCH
+          sed -i "s/GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=${VERSION#1.24.}/" golang/Makefile
+          
+          # Update PKG_HASH
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          # Update README if exists
+          if [ -f README.md ]; then
+            sed -i "s/Go 1.24\.[0-9]*/Go $VERSION/g" README.md
+          fi
+          
+          echo "=== Updated files ==="
+          cat golang/Makefile | grep -E "GO_VERSION|PKG_VERSION|PKG_HASH"
+
+      - name: Commit and Push
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          git add golang/Makefile
+          git commit -m "golang: update to ${{ needs.check-main.outputs.version }}"
+          git push origin main
+
+  update-1.25:
+    needs: check-1.25
+    if: needs.check-1.25.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.25
+
+      - name: Update Makefile
+        run: |
+          VERSION="${{ needs.check-1.25.outputs.version }}"
+          HASH="${{ needs.check-1.25.outputs.hash }}"
+          
+          sed -i "s/GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=${VERSION#1.25.}/" golang/Makefile
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          if [ -f README.md ]; then
+            sed -i "s/Go 1.25\.[0-9]*/Go $VERSION/g" README.md
+          fi
+          
+          cat golang/Makefile | grep -E "GO_VERSION|PKG_VERSION|PKG_HASH"
+
+      - name: Commit and Push
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          git add golang/Makefile
+          git commit -m "golang: update to ${{ needs.check-1.25.outputs.version }}"
+          git push origin 1.25
+
+  update-1.26:
+    needs: check-1.26
+    if: needs.check-1.26.outputs.needs_update == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1.26
+
+      - name: Update Makefile
+        run: |
+          VERSION="${{ needs.check-1.26.outputs.version }}"
+          HASH="${{ needs.check-1.26.outputs.hash }}"
+          
+          # For rc/beta versions, update GO_VERSION_MAJOR_MINOR
+          sed -i "s/GO_VERSION_MAJOR_MINOR:=.*/GO_VERSION_MAJOR_MINOR:=$VERSION/" golang/Makefile
+          sed -i "s/GO_VERSION_PATCH:=/GO_VERSION_PATCH:=/" golang/Makefile
+          sed -i "s/PKG_HASH:=.*/PKG_HASH:=$HASH/" golang/Makefile
+          
+          if [ -f README.md ]; then
+            sed -i "s/Go 1.26[a-z0-9]*/Go $VERSION/g" README.md
+          fi
+          
+          cat golang/Makefile | grep -E "GO_VERSION|PKG_VERSION|PKG_HASH"
+
+      - name: Commit and Push
+        run: |
+          cd $GITHUB_WORKSPACE
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          git add golang/Makefile
+          git commit -m "golang: update to ${{ needs.check-1.26.outputs.version }}"
+          git push origin 1.26
