@@ -24,6 +24,9 @@ jobs:
           - branch: "1.26"
             track: "1.26"
             type: prerelease
+          - branch: "1.27"
+            track: "1.27"
+            type: stable
 
     steps:
       - name: Checkout branch
